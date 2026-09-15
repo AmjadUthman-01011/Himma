@@ -1,0 +1,379 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+/// =====================================================
+// USER
+// =====================================================
+
+model User {
+  id        Int      @id @default(autoincrement())
+  email     String   @unique
+  password  String
+  isActive  Boolean  @default(true)
+  role      Role     @default(STUDENT)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  student       Student?
+  teacher       Teacher?
+  notifications Notification[]
+  sessions      Session[]
+}
+
+// =====================================================
+// ROLE
+// =====================================================
+
+enum Role {
+  ADMIN
+  TEACHER
+  STUDENT
+}
+
+// =====================================================
+// STUDENT
+// =====================================================
+
+model Student {
+  id          Int       @id @default(autoincrement())
+  userId      Int       @unique
+  firstName   String
+  lastName    String
+  dateOfBirth DateTime?
+  phone       String?
+  address     String?
+  class       String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  enrollments Enrollment[]
+  submissions Submission[]
+  grades      Grade[]
+}
+
+// =====================================================
+// TEACHER
+// =====================================================
+
+model Teacher {
+  id        Int      @id @default(autoincrement())
+  userId    Int      @unique
+  firstName String
+  lastName  String
+  phone     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  courses Course[]
+  tests   Test[]
+}
+
+// =====================================================
+// COURSE
+// =====================================================
+
+model Course {
+  id          Int          @id @default(autoincrement())
+  code        String       @unique
+  name        String
+  description String?
+  credits     Int          @default(3)
+  teacherId   Int
+  status      CourseStatus @default(DRAFT)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  teacher Teacher @relation(fields: [teacherId], references: [id])
+
+  enrollments Enrollment[]
+  tests       Test[]
+  grades      Grade[]
+  chapters    Chapter[]
+}
+
+// =====================================================
+// COURSE STATUS
+// =====================================================
+
+enum CourseStatus {
+  DRAFT
+  ACTIVE
+  COMPLETED
+  ARCHIVED
+}
+
+// =====================================================
+// ENROLLMENT
+// =====================================================
+
+model Enrollment {
+  id         Int              @id @default(autoincrement())
+  studentId  Int
+  courseId   Int
+  enrolledAt DateTime         @default(now())
+  status     EnrollmentStatus @default(ACTIVE)
+
+  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  course Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  @@unique([studentId, courseId])
+}
+
+// =====================================================
+// ENROLLMENT STATUS
+// =====================================================
+
+enum EnrollmentStatus {
+  ACTIVE
+  COMPLETED
+  DROPPED
+}
+
+// =====================================================
+// GRADE
+// =====================================================
+
+model Grade {
+  id        Int      @id @default(autoincrement())
+  studentId Int
+  courseId  Int
+  score     Float
+  grade     String?
+  semester  String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  course Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  @@unique([studentId, courseId, semester])
+}
+
+// =====================================================
+// TEST
+// =====================================================
+
+model Test {
+  id          Int       @id @default(autoincrement())
+  courseId    Int
+  teacherId   Int
+  title       String
+  description String?
+  startDate   DateTime?
+  endDate     DateTime?
+  maxScore    Float     @default(100)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  course Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  teacher Teacher @relation(fields: [teacherId], references: [id])
+
+  questions   Question[]
+  submissions Submission[]
+}
+
+// =====================================================
+// QUESTION
+// =====================================================
+
+model Question {
+  id        Int          @id @default(autoincrement())
+  testId    Int
+  text      String
+  type      QuestionType
+  points    Float        @default(1)
+  order     Int
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+
+  test Test @relation(fields: [testId], references: [id], onDelete: Cascade)
+
+  options QuestionOption[]
+  answers Answer[]
+
+  @@unique([testId, order])
+}
+
+// =====================================================
+// QUESTION TYPE
+// =====================================================
+
+enum QuestionType {
+  MULTIPLE_CHOICE
+  TRUE_FALSE
+  SHORT_ANSWER
+}
+
+// =====================================================
+// QUESTION OPTION
+// =====================================================
+
+model QuestionOption {
+  id         Int     @id @default(autoincrement())
+  questionId Int
+  text       String
+  isCorrect  Boolean @default(false)
+
+  question Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+}
+
+// =====================================================
+// SUBMISSION
+// =====================================================
+
+model Submission {
+  id          Int              @id @default(autoincrement())
+  testId      Int
+  studentId   Int
+  submittedAt DateTime         @default(now())
+  fileUrl     String?
+  score       Float?
+  feedback    String?
+  status      SubmissionStatus @default(SUBMITTED)
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  test Test @relation(fields: [testId], references: [id], onDelete: Cascade)
+
+  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  answers Answer[]
+
+  @@unique([testId, studentId])
+}
+
+// =====================================================
+// SUBMISSION STATUS
+// =====================================================
+
+enum SubmissionStatus {
+  IN_PROGRESS
+  SUBMITTED
+  GRADED
+}
+
+// =====================================================
+// ANSWER
+// =====================================================
+
+model Answer {
+  id           Int      @id @default(autoincrement())
+  submissionId Int
+  questionId   Int
+  answer       String?
+  isCorrect    Boolean?
+  points       Float?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  submission Submission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+
+  question Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  @@unique([submissionId, questionId])
+}
+
+// =====================================================
+// NOTIFICATION
+// =====================================================
+
+model Notification {
+  id        Int              @id @default(autoincrement())
+  userId    Int
+  title     String
+  message   String
+  type      NotificationType @default(GENERAL)
+  isRead    Boolean          @default(false)
+  readAt    DateTime?
+  createdAt DateTime         @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, isRead])
+}
+
+// =====================================================
+// NOTIFICATION TYPE
+// =====================================================
+
+enum NotificationType {
+  GENERAL
+  COURSE
+  ENROLLMENT
+  TEST
+  GRADE
+  SYSTEM
+}
+
+//Session
+model Session {
+  id           Int       @id @default(autoincrement())
+  userId       Int
+  refreshToken String    @unique
+  expiresAt    DateTime
+  createdAt    DateTime  @default(now())
+  revokedAt    DateTime?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model Chapter {
+  id          Int      @id @default(autoincrement())
+  courseId    Int
+  title       String
+  description String?
+  order       Int
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  course Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  videos ChapterVideo[]
+  files  ChapterFile[]
+
+  @@unique([courseId, order])
+}
+
+model ChapterVideo {
+  id        Int      @id @default(autoincrement())
+  chapterId Int
+  title     String
+  videoUrl  String
+  duration  Int?
+  order     Int
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  chapter Chapter @relation(fields: [chapterId], references: [id], onDelete: Cascade)
+
+  @@unique([chapterId, order])
+}
+
+model ChapterFile {
+  id        Int      @id @default(autoincrement())
+  chapterId Int
+  name      String
+  fileUrl   String
+  fileType  String?
+  fileSize  Int?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  chapter Chapter @relation(fields: [chapterId], references: [id], onDelete: Cascade)
+}
