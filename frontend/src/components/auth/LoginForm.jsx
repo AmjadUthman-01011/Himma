@@ -43,7 +43,7 @@ export default function LoginForm() {
     }
   };
 
-  const handleSubmit = async (event) => {
+  const handleSubmit = async (events) => {
     event.preventDefault();
 
     setError("");
